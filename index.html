@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pagamento via Pix - InvictusPay</title>
+  <style>
+    body {
+      background: #0b1220;
+      color: #fff;
+      font-family: Arial, sans-serif;
+      text-align: center;
+      padding: 40px 20px;
+    }
+    h1 {
+      color: #00e1ff;
+    }
+    input {
+      padding: 10px;
+      font-size: 16px;
+      border-radius: 8px;
+      border: none;
+      text-align: center;
+      width: 200px;
+    }
+    .card {
+      background: rgba(255,255,255,0.05);
+      padding: 20px;
+      border-radius: 12px;
+      display: inline-block;
+      box-shadow: 0 0 20px rgba(0,0,0,0.4);
+      margin-top: 30px;
+    }
+    img {
+      width: 260px;
+      margin-top: 20px;
+      border-radius: 10px;
+      background: #fff;
+      padding: 10px;
+    }
+    pre {
+      background: rgba(255,255,255,0.1);
+      color: #00ffcc;
+      padding: 10px;
+      border-radius: 8px;
+      margin-top: 10px;
+      word-break: break-all;
+    }
+    button {
+      background: #00e1ff;
+      border: none;
+      border-radius: 6px;
+      color: #000;
+      font-weight: bold;
+      cursor: pointer;
+      padding: 10px 14px;
+      margin-top: 10px;
+    }
+    .error {
+      color: #ff7070;
+      margin-top: 10px;
+      white-space: pre-wrap;
+      text-align: left;
+    }
+  </style>
+</head>
+<body>
+  <h1>💸 Pagamento via Pix</h1>
+  <p>Digite o valor que deseja pagar:</p>
+  <input id="amount" type="number" placeholder="Ex: 49.90" min="1" step="0.01">
+
+  <div class="card" id="paymentCard" style="display:none;">
+    <h2>Escaneie o QR Code abaixo:</h2>
+    <img id="qrImage" alt="QR Code Pix">
+    <h3>Ou copie o código Pix:</h3>
+    <pre id="brCode">Gerando...</pre>
+    <button id="copyBtn">📋 Copiar Código Pix</button>
+  </div>
+
+  <div id="errorBox" class="error"></div>
+
+  <script>
+    const API_URL = "https://api.invictuspay.app.br/api/public/v1/transactions";
+    const API_TOKEN = "DwJ8IpN7KK81WlZxS98aHH0hCHCIiZORyuvFtz0MdsEyGbjNLC1JCro4lzG0";
+    const OFFER_HASH = "ieydtkjkzd";
+
+    const amountInput = document.getElementById('amount');
+    const paymentCard = document.getElementById('paymentCard');
+    const qrImage = document.getElementById('qrImage');
+    const brCode = document.getElementById('brCode');
+    const copyBtn = document.getElementById('copyBtn');
+    const errorBox = document.getElementById('errorBox');
+
+    let timeout;
+
+    amountInput.addEventListener('input', () => {
+      clearTimeout(timeout);
+      const val = parseFloat(amountInput.value);
+      if (!val || val <= 0) return;
+      timeout = setTimeout(() => gerarPix(val), 1000);
+    });
+
+    async function gerarPix(valor) {
+      errorBox.textContent = "";
+      paymentCard.style.display = "none";
+      const valorCentavos = Math.round(valor * 100);
+
+      const body = {
+        amount: valorCentavos,
+        offer_hash: OFFER_HASH,
+        payment_method: "pix",
+        customer: {
+          name: "Cliente Web",
+          email: "cliente@exemplo.com",
+          phone_number: "11999999999",
+          document: "12345678900"
+        },
+        cart: [
+          {
+            product_hash: OFFER_HASH,
+            title: "Produto Premium Invictus",
+            price: valorCentavos,
+            quantity: 1
+          }
+        ]
+      };
+
+      try {
+        const res = await fetch(`${API_URL}?api_token=${API_TOKEN}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Accept": "application/json" },
+          body: JSON.stringify(body)
+        });
+
+        const data = await res.json();
+        console.log("Resposta API:", data);
+
+        if (data && data.pix && data.pix.qr_code_base64) {
+          paymentCard.style.display = "inline-block";
+          qrImage.src = data.pix.qr_code_base64;
+          brCode.textContent = data.pix.qr_code || "Código Pix indisponível";
+        } else {
+          errorBox.textContent = "Erro da API:\n" + JSON.stringify(data, null, 2);
+        }
+      } catch (err) {
+        console.error(err);
+        errorBox.textContent = "Erro na requisição:\n" + err.message;
+      }
+    }
+
+    copyBtn.addEventListener('click', () => {
+      navigator.clipboard.writeText(brCode.textContent)
+        .then(() => alert("Código Pix copiado!"))
+        .catch(() => alert("Não foi possível copiar o código."));
+    });
+  </script>
+</body>
+</html>
